@@ -1,29 +1,35 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, BeforeInsert } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 
-@Entity()
+@Entity('users')
 export class User {
-  // this decorator will help to auto generate id for the table.
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar', length: 30 })
-  name: string;
-
-  @Column({ type: 'varchar', length: 15 })
-  username: string;
+  @Column({ unique: true })
   email: string;
 
-  @Column({ type: 'int' })
-  age: number;
-
-  @Column({ type: 'varchar' })
+  @Column()
   password: string;
 
-  @Column({ type: 'enum', enum: ['m', 'f', 'u'] })
-  /**
-   * m - male
-   * f - female
-   * u - unspecified
-   */
-  gender: string;
+  @Column()
+  name: string;
+
+  @Column({ nullable: true })
+  image: string; // Path to the uploaded image file
+
+  @Column()
+  gender: 'male' | 'female' | 'other'; // ENUM type for gender
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @BeforeInsert()
+  async hashPassword() {
+    this.password = await bcrypt.hash(this.password, 10);
+  }
+
+  async validatePassword(password: string): Promise<boolean> {
+    return bcrypt.compare(password, this.password);
+  }
 }

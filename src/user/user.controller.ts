@@ -1,43 +1,58 @@
 import {
   Controller,
-  Get,
   Post,
   Body,
-  Patch,
-  Param,
-  Delete,
+  UseGuards,
+  Get,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-
 import { UserService } from './user.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-
-@Controller('user')
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { extname } from 'path';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { AuthRegisterDto } from 'src/auth/dto/auth-register.dto';
+@Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private userService: UserService) {}
 
-  @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.userService.create(createUserDto);
+  // Helper function to control file upload destination and filename
+  private static editFileName(req, file, callback) {
+    const fileExtName = extname(file.originalname);
+    const fileName = `${Date.now()}-${file.originalname}`;
+    callback(null, fileName);
   }
 
-  @Get()
-  findAll() {
-    return this.userService.findAllUser();
+  @Post('register')
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: diskStorage({
+        destination: './uploads/profile-images', // Directory where images will be stored
+        filename: UserController.editFileName, // Naming strategy for uploaded files
+      }),
+    }),
+  )
+  async register(
+    @Body() authRegisterDto: AuthRegisterDto, // Validate request body using DTO
+    @UploadedFile() image: Express.Multer.File, // Image handling with Multer
+  ) {
+    const { email, password, name, gender } = authRegisterDto;
+    const imagePath = image ? image.filename : null; // Use image filename if uploaded
+
+    // Fix: Pass all required arguments to createUser()
+    return this.userService.createUser(
+      email,
+      password,
+      name,
+      gender,
+      imagePath,
+    );
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.viewUser(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.updateUser(+id, updateUserDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.removeUser(+id);
+  @UseGuards(JwtAuthGuard)
+  @Get('/profile')
+  getProfile() {
+    return { message: 'This is a protected route' };
   }
 }
